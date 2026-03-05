@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pre-CMS</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 상단 참여자 정보 바 */
+    #participantBar {
+      background-color: #3a7bd5;
+      color: white;
+      padding: 5px 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      font-size: 0.9em;
+    }
+    #participantBar .bar-title { font-weight: bold; }
+    #participantBar button {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.5);
+      padding: 3px 10px;
+      cursor: pointer;
+      font-size: 0.85em;
+      margin: 0 3px;
+      border-radius: 3px;
+    }
+    #participantBar button:hover { background: rgba(255,255,255,0.35); }
+    /* 메인 컨텐츠 */
+    #mainContent {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* 좌측: 진술문 카드 영역 */
+    #cardsContainer {
+      width: 27.5%;
+      height: 100%;
+      border-right: 1px solid #ccc;
+      padding: 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    /* 우측: 그룹 영역 */
+    #groupsContainer {
+      width: 72.5%;
+      height: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+    h2 { text-align: center; margin: 5px 0; }
+    .card {
+      background-color: #f9f9f9;
+      margin: 5px 0;
+      padding: 8px;
+      border: 1px solid #aaa;
+      cursor: move;
+      font-size: 0.9em;
+    }
+    #groupsList {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      overflow-x: auto;
+      flex-grow: 1;
+      padding-bottom: 5px;
+      align-items: flex-start;
+    }
+    .group {
+      width: 220px;
+      border: 1px solid #aaa;
+      background-color: #f9f9f9;
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 5px;
+      min-height: 150px;
+      flex-shrink: 0;
+    }
+    .group-header { display: flex; flex-direction: column; }
+    .group-header .group-name {
+      text-align: center;
+      font-weight: bold;
+      background-color: #e2e2e2;
+      padding: 5px;
+    }
+    .group-header .group-extra { text-align: center; padding: 5px; }
+    .group-header .group-extra input {
+      width: 65%;
+      border: 1px solid #ccc;
+      padding: 2px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .group-header .group-extra input.invalid { border: 1px solid red; }
+    .cards { padding: 5px; flex-grow: 1; min-height: 100px; }
+    .dragover { border: 2px dashed #666; }
+    .evaluation {
+      margin: 5px 0;
+      padding: 8px;
+      border: 1px solid #aaa;
+      display: flex;
+      align-items: center;
+      background-color: #f0f0f0;
+    }
+    .evaluation span { margin-right: 10px; min-width: 40px; font-weight: bold; }
+    .rating-options { display: flex; flex-direction: row; }
+    .rating-options button { margin: 0 5px; padding: 5px 10px; cursor: pointer; }
+    .rating-options button.selected { background-color: #4CAF50; color: white; }
+    .legend { text-align: center; margin-bottom: 10px; font-size: 70%; }
+    #evaluationResult { font-size: 80%; text-align: center; margin: 10px 0; }
+    #uploadExcelContainer { text-align: center; margin-bottom: 8px; }
+    #bottomButtons {
+      flex-shrink: 0;
+      text-align: center;
+      margin-top: 5px;
+      border-top: 1px solid #ccc;
+      padding-top: 5px;
+    }
+    button { margin: 3px; padding: 5px 10px; cursor: pointer; }
+    /* 모달 공통 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      text-align: center;
+      min-width: 300px;
+      max-width: 500px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-content h3 { margin-top: 0; color: #3a7bd5; }
+    .modal-content p { margin-bottom: 10px; }
+    .modal-content input[type="text"] {
+      width: 80%;
+      padding: 8px;
+      margin-bottom: 12px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    /* 참여자 목록 */
+    .participant-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      margin: 4px 0;
+      border-radius: 4px;
+      background: #f9f9f9;
+      text-align: left;
+    }
+    .participant-item .p-info { flex: 1; }
+    .participant-item .p-name { font-weight: bold; font-size: 0.95em; }
+    .participant-item .p-meta { font-size: 0.75em; color: #777; margin-top: 2px; }
+    .participant-item .p-actions { display: flex; gap: 4px; }
+    .btn-primary {
+      background: #3a7bd5; color: white; border: none;
+      border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 0.82em;
+    }
+    .btn-danger {
+      background: #e53935; color: white; border: none;
+      border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 0.82em;
+    }
+  </style>
+  <!-- SheetJS 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    var currentParticipant = '';
+    var cardCount = 0;
+    var groupCount = 4;
+    var maxAdditionalGroups = 8;
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    /* ===== 참여자 관리 ===== */
+    function initApp() {
+      showParticipantModal();
+    }
+
+    function showParticipantModal() {
+      var modal = document.getElementById('participantModal');
+      modal.style.display = 'flex';
+      setTimeout(function() {
+        document.getElementById('participantNameInput').focus();
+      }, 100);
+    }
+
+    function confirmParticipant() {
+      var input = document.getElementById('participantNameInput');
+      var name = input.value.trim();
+      if (!name) {
+        input.style.border = '2px solid red';
+        return;
+      }
+      input.style.border = '';
+      currentParticipant = name;
+      document.getElementById('participantModal').style.display = 'none';
+      document.getElementById('currentParticipantName').textContent = name;
+      updateResearcherUI();
+
+      var saved = localStorage.getItem('preCMS_' + name);
+
+      if (name === '연구자') {
+        // 연구자: 저장된 데이터가 있으면 무조건 불러옴 (새로 시작 불가)
+        if (saved) {
+          loadState(name);
+        }
+        // 저장된 데이터가 없으면 빈 화면에서 최초 설정 시작
+      } else {
+        // 일반 참여자
+        if (saved) {
+          if (confirm('"' + name + '"님의 저장된 작업 데이터가 있습니다.\n불러오시겠습니까?\n(아니오 선택 시 새로 시작합니다)')) {
+            loadState(name);
+          } else {
+            // 새로 시작 시에도 연구자 카드 목록으로 초기화
+            loadResearcherCards();
+          }
+        } else {
+          // 첫 접속: 연구자가 설정한 카드 목록으로 시작
+          loadResearcherCards();
+        }
+      }
+    }
+
+    function participantKeydown(e) {
+      if (e.key === 'Enter') confirmParticipant();
+    }
+
+    /* ===== 상태 저장/불러오기 ===== */
+    function saveState() {
+      if (!currentParticipant) return;
+
+      var allCards = {};
+      document.querySelectorAll('.card').forEach(function(card) {
+        allCards[card.id] = card.textContent;
+      });
+
+      var groups = [];
+      document.querySelectorAll('#groupsList .group').forEach(function(group) {
+        var input = group.querySelector('.group-extra-input');
+        var cardIds = [];
+        group.querySelectorAll('.cards .card').forEach(function(card) {
+          cardIds.push(card.id);
+        });
+        groups.push({
+          id: group.id,
+          extraName: input ? input.value.trim() : '',
+          cardIds: cardIds
+        });
+      });
+
+      var ungroupedIds = [];
+      document.querySelectorAll('#cardsContainer .card').forEach(function(card) {
+        ungroupedIds.push(card.id);
+      });
+
+      var state = {
+        version: 1,
+        timestamp: new Date().toISOString(),
+        cardCount: cardCount,
+        groupCount: groupCount,
+        allCards: allCards,
+        groups: groups,
+        ungroupedIds: ungroupedIds
+      };
+
+      localStorage.setItem('preCMS_' + currentParticipant, JSON.stringify(state));
+    }
+
+    function loadState(name) {
+      var stateStr = localStorage.getItem('preCMS_' + name);
+      if (!stateStr) return;
+      var state;
+      try { state = JSON.parse(stateStr); } catch(e) { alert('데이터를 불러오는 데 실패했습니다.'); return; }
+      loadStateFromObject(state);
+    }
+
+    // 상태 객체로부터 UI 복원 (저장된 그룹 배치 포함)
+    function loadStateFromObject(state) {
+      document.querySelectorAll('#cardsContainer .card').forEach(function(c) { c.remove(); });
+      var groupsList = document.getElementById('groupsList');
+      groupsList.innerHTML = '';
+      groupsList.style.flexDirection = 'row';
+
+      cardCount = state.cardCount || 0;
+      groupCount = state.groupCount || 4;
+
+      var savedGroups = state.groups && state.groups.length > 0 ? state.groups : [];
+      if (savedGroups.length === 0) {
+        for (var i = 1; i <= 4; i++) { createGroupElement(i); }
+        groupCount = 4;
+      } else {
+        savedGroups.forEach(function(sg) {
+          var num = parseInt(sg.id.replace('group', ''), 10);
+          createGroupElement(num);
+          var groupEl = document.getElementById(sg.id);
+          if (groupEl && sg.extraName) {
+            var inp = groupEl.querySelector('.group-extra-input');
+            if (inp) inp.value = sg.extraName;
+          }
+        });
+      }
+
+      var allCards = state.allCards || {};
+      var cardIds = Object.keys(allCards).sort(function(a, b) {
+        return parseInt(a.replace('card','')) - parseInt(b.replace('card',''));
+      });
+      cardIds.forEach(function(cardId) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.id = cardId;
+        card.textContent = allCards[cardId];
+        addDragEvents(card);
+        document.getElementById('cardsContainer').appendChild(card);
+      });
+
+      savedGroups.forEach(function(sg) {
+        var groupEl = document.getElementById(sg.id);
+        if (!groupEl) return;
+        var cardsDiv = groupEl.querySelector('.cards');
+        (sg.cardIds || []).forEach(function(cardId) {
+          var card = document.getElementById(cardId);
+          if (card) cardsDiv.appendChild(card);
+        });
+      });
+    }
+
+    // 연구자가 저장한 카드만 불러오기 (그룹 배치 없이 모두 카드 영역에)
+    function loadResearcherCards() {
+      var researcherStr = localStorage.getItem('preCMS_연구자');
+      if (!researcherStr) return false;
+      var researcherState;
+      try { researcherState = JSON.parse(researcherStr); } catch(e) { return false; }
+      var allCards = researcherState.allCards || {};
+      if (Object.keys(allCards).length === 0) return false;
+
+      document.querySelectorAll('#cardsContainer .card').forEach(function(c) { c.remove(); });
+      var groupsList = document.getElementById('groupsList');
+      groupsList.innerHTML = '';
+      groupsList.style.flexDirection = 'row';
+      for (var i = 1; i <= 4; i++) { createGroupElement(i); }
+      cardCount = researcherState.cardCount || 0;
+      groupCount = 4;
+
+      // 카드 전부 cardsContainer에 배치 (그룹 미배치 상태로)
+      var cardIds = Object.keys(allCards).sort(function(a, b) {
+        return parseInt(a.replace('card','')) - parseInt(b.replace('card',''));
+      });
+      cardIds.forEach(function(cardId) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.id = cardId;
+        card.textContent = allCards[cardId];
+        addDragEvents(card);
+        document.getElementById('cardsContainer').appendChild(card);
+      });
+      return true;
+    }
+
+    function getAllParticipants() {
+      var list = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.startsWith('preCMS_')) {
+          var name = key.slice(7);
+          try {
+            var state = JSON.parse(localStorage.getItem(key));
+            list.push({
+              name: name,
+              timestamp: state.timestamp || '',
+              cardCount: state.cardCount || 0,
+              groupCount: (state.groups || []).length
+            });
+          } catch(e) {
+            list.push({ name: name, timestamp: '', cardCount: 0, groupCount: 0 });
+          }
+        }
+      }
+      list.sort(function(a, b) { return b.timestamp.localeCompare(a.timestamp); });
+      return list;
+    }
+
+    function showParticipantList() {
+      var participants = getAllParticipants();
+      var list = document.getElementById('participantList');
+      list.innerHTML = '';
+      if (participants.length === 0) {
+        list.innerHTML = '<p style="color:#888;text-align:center;padding:12px">저장된 참여자 데이터가 없습니다.</p>';
+      } else {
+        participants.forEach(function(p) {
+          var dt = p.timestamp ? new Date(p.timestamp).toLocaleString('ko-KR') : '-';
+          var item = document.createElement('div');
+          item.className = 'participant-item';
+          item.innerHTML =
+            '<div class="p-info">' +
+              '<div class="p-name">' + escapeHtml(p.name) + '</div>' +
+              '<div class="p-meta">저장: ' + dt + ' | 카드 ' + p.cardCount + '개 | 그룹 ' + p.groupCount + '개</div>' +
+            '</div>' +
+            '<div class="p-actions">' +
+              '<button class="btn-primary" onclick="switchToParticipant(\'' + escapeAttr(p.name) + '\')">불러오기</button>' +
+              '<button class="btn-danger" onclick="deleteParticipant(\'' + escapeAttr(p.name) + '\')">삭제</button>' +
+            '</div>';
+          list.appendChild(item);
+        });
+      }
+      document.getElementById('participantListModal').style.display = 'flex';
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function escapeAttr(str) {
+      return str.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    }
+
+    function switchToParticipant(name) {
+      if (currentParticipant) saveState();
+      currentParticipant = name;
+      document.getElementById('currentParticipantName').textContent = name;
+      updateResearcherUI();
+      document.getElementById('participantListModal').style.display = 'none';
+      resetUIOnly();
+      loadState(name);
+    }
+
+    function deleteParticipant(name) {
+      if (confirm('"' + name + '"님의 데이터를 삭제하시겠습니까?')) {
+        localStorage.removeItem('preCMS_' + name);
+        showParticipantList();
+      }
+    }
+
+    function addNewParticipantFromList() {
+      document.getElementById('participantListModal').style.display = 'none';
+      document.getElementById('participantNameInput').value = '';
+      showParticipantModal();
+    }
+
+    function resetUIOnly() {
+      document.querySelectorAll('.card').forEach(function(c) { c.remove(); });
+      var groupsList = document.getElementById('groupsList');
+      groupsList.innerHTML = '';
+      groupsList.style.flexDirection = 'row';
+      for (var i = 1; i <= 4; i++) { createGroupElement(i); }
+      cardCount = 0;
+      groupCount = 4;
+      document.getElementById('evaluationResult').innerHTML = '';
+      var saveBtn = document.getElementById('saveRatingsBtn');
+      if (saveBtn) saveBtn.remove();
+    }
+
+    // '연구자'로 로그인한 경우에만 참여자 관리 버튼 표시
+    function updateResearcherUI() {
+      var btn = document.getElementById('manageParticipantsBtn');
+      if (btn) btn.style.display = (currentParticipant === '연구자') ? '' : 'none';
+    }
+
+    /* ===== 드래그앤드 드롭 ===== */
+    function groupDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('dragover');
+    }
+    function groupDragLeave(e) {
+      e.currentTarget.classList.remove('dragover');
+    }
+    function groupDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      var cardId = e.dataTransfer.getData('text/plain');
+      var card = document.getElementById(cardId);
+      e.currentTarget.querySelector('.cards').appendChild(card);
+      autoRemoveEmptyGroups();
+      saveState();
+    }
+    function autoRemoveEmptyGroups() {
+      if (document.querySelectorAll('#cardsContainer .card').length === 0) {
+        document.querySelectorAll('#groupsList .group').forEach(function(group) {
+          var cards = group.querySelector('.cards');
+          if (cards && cards.childElementCount === 0) group.remove();
+        });
+      }
+    }
+
+    /* ===== 커스텀 프롬프트 ===== */
+    function customPrompt(message) {
+      return new Promise(function(resolve) {
+        var modal = document.getElementById('customPrompt');
+        document.getElementById('promptMessage').textContent = message;
+        document.getElementById('promptInput').value = '';
+        modal.style.display = 'flex';
+        document.getElementById('promptOk').onclick = function() {
+          modal.style.display = 'none';
+          resolve(document.getElementById('promptInput').value);
+        };
+        document.getElementById('promptCancel').onclick = function() {
+          modal.style.display = 'none';
+          resolve(null);
+        };
+      });
+    }
+
+    async function globalDeleteGroup() {
+      var val = await customPrompt('몇번 그룹을 삭제할까요? (예: 1 또는 01)');
+      if (val === null) return;
+      var num = parseInt(val, 10);
+      if (isNaN(num) || num < 1) { alert('유효한 그룹 번호를 입력하세요.'); return; }
+      var group = document.getElementById('group' + num);
+      if (!group) { alert('해당 번호의 그룹이 없습니다.'); return; }
+      if (group.querySelectorAll('.cards .card').length > 0) {
+        alert('오류: 해당 그룹에 진술문 카드가 있습니다. 삭제할 수 없습니다.'); return;
+      }
+      group.remove();
+      saveState();
+    }
+
+    function checkGroupExtra() {
+      var inputs = document.querySelectorAll('.group-extra-input');
+      for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].value.trim() === '') {
+          alert("모든 그룹에 대해 '그룹이름추가'를 입력하세요");
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function addDragEvents(card) {
+      card.setAttribute('draggable', 'true');
+      card.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', e.target.id);
+      });
+    }
+
+    function uploadExcel() {
+      var fileInput = document.getElementById('excelInput');
+      var file = fileInput.files[0];
+      if (!file) { alert('엑셀 파일을 선택하세요.'); return; }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var data = new Uint8Array(e.target.result);
+        var workbook = XLSX.read(data, { type: 'array' });
+        var sheet = workbook.Sheets[workbook.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        rows.forEach(function(row) {
+          if (row[0] && String(row[0]).trim() !== '') {
+            addCard(String(row[0]).trim());
+          }
+        });
+        saveState();
+      };
+      reader.readAsArrayBuffer(file);
+      fileInput.value = '';
+    }
+
+    function addCard(text) {
+      cardCount++;
+      var num = pad2(cardCount);
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.id = 'card' + num;
+      card.textContent = 's' + num + ': ' + text;
+      addDragEvents(card);
+      document.getElementById('cardsContainer').appendChild(card);
+    }
+
+    function createGroupElement(num) {
+      var groupsList = document.getElementById('groupsList');
+      var groupDiv = document.createElement('div');
+      groupDiv.className = 'group';
+      groupDiv.id = 'group' + num;
+      groupDiv.setAttribute('ondragover', 'groupDragOver(event)');
+      groupDiv.setAttribute('ondragleave', 'groupDragLeave(event)');
+      groupDiv.setAttribute('ondrop', 'groupDrop(event)');
+      var headerDiv = document.createElement('div');
+      headerDiv.className = 'group-header';
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'group-name';
+      nameDiv.textContent = 'G' + pad2(num);
+      var extraDiv = document.createElement('div');
+      extraDiv.className = 'group-extra';
+      var extraInput = document.createElement('input');
+      extraInput.type = 'text';
+      extraInput.className = 'group-extra-input';
+      extraInput.placeholder = '그룹이름추가';
+      extraInput.addEventListener('change', saveState);
+      extraDiv.appendChild(extraInput);
+      headerDiv.appendChild(nameDiv);
+      headerDiv.appendChild(extraDiv);
+      var cardsDiv = document.createElement('div');
+      cardsDiv.className = 'cards';
+      groupDiv.appendChild(headerDiv);
+      groupDiv.appendChild(cardsDiv);
+      groupsList.appendChild(groupDiv);
+      return groupDiv;
+    }
+
+    function addGroup() {
+      if (groupCount >= 4 + maxAdditionalGroups) {
+        alert('최대 그룹 수(총 12개)를 초과할 수 없습니다.');
+        return;
+      }
+      groupCount++;
+      createGroupElement(groupCount);
+      saveState();
+    }
+
+    function exportMatrix() {
+      if (!checkGroupExtra()) return;
+      var cards = Array.from(document.querySelectorAll('.card'));
+      if (cards.length === 0) { alert('진술문 카드가 없습니다. 추가 후 내보내세요.'); return; }
+      cards.sort(function(a, b) { return parseInt(a.id.replace('card','')) - parseInt(b.id.replace('card','')); });
+      var cardGroups = cards.map(function(card) {
+        var parent = card.parentElement;
+        return (parent && parent.classList.contains('cards')) ? parent.parentElement.id : 'ungrouped';
+      });
+      var countMap = {};
+      cardGroups.forEach(function(g) { countMap[g] = (countMap[g] || 0) + 1; });
+      for (var g in countMap) {
+        if (countMap[g] === 1) { alert("오류: 그룹 '" + g + "'에 진술문 카드가 한 개만 있습니다. 다시 분류하세요."); return; }
+      }
+      if (new Set(cardGroups).size === 1) { alert('오류: 모든 진술문 카드가 한 그룹에 분류되어 있습니다. 다시 분류하세요.'); return; }
+      var csv = 'Statement';
+      cards.forEach(function(c) { csv += ',' + c.id.replace('card','s'); });
+      csv += '\n';
+      for (var i = 0; i < cards.length; i++) {
+        csv += cards[i].id.replace('card','s');
+        for (var j = 0; j < cards.length; j++) {
+          csv += (cardGroups[i] === cardGroups[j]) ? ',0' : ',1';
+        }
+        csv += '\n';
+      }
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.style.visibility = 'hidden';
+      a.download = (currentParticipant || 'output') + '_similarity_matrix.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    function saveGroupHTML() {
+      if (!checkGroupExtra()) return;
+      var cards = Array.from(document.querySelectorAll('.card'));
+      if (cards.length === 0) { alert('진술문 카드가 없습니다.'); return; }
+      cards.sort(function(a, b) { return parseInt(a.id.replace('card','')) - parseInt(b.id.replace('card','')); });
+      var cardGroups = cards.map(function(card) {
+        var parent = card.parentElement;
+        return (parent && parent.classList.contains('cards')) ? parent.parentElement.id : 'ungrouped';
+      });
+      var countMap = {};
+      cardGroups.forEach(function(g) { countMap[g] = (countMap[g] || 0) + 1; });
+      for (var g in countMap) {
+        if (countMap[g] === 1) { alert("오류: 그룹 '" + g + "'에 진술문 카드가 한 개만 있습니다. 다시 분류하세요."); return; }
+      }
+      if (new Set(cardGroups).size === 1) { alert('오류: 모든 진술문 카드가 한 그룹에 분류되어 있습니다. 다시 분류하세요.'); return; }
+      var clone = document.getElementById('groupsContainer').cloneNode(true);
+      clone.querySelectorAll('button').forEach(function(b) { b.remove(); });
+      clone.querySelectorAll('.group-extra-input').forEach(function(inp) {
+        var s = document.createElement('span');
+        s.textContent = inp.value.trim();
+        inp.parentNode.replaceChild(s, inp);
+      });
+      var participantInfo = currentParticipant ? '<p><strong>연구참여자:</strong> ' + escapeHtml(currentParticipant) + '</p>\n  ' : '';
+      var html = '<!DOCTYPE html>\n<html lang="ko">\n<head>\n  <meta charset="UTF-8">\n' +
+        '  <title>그룹 분류 결과' + (currentParticipant ? ' - ' + escapeHtml(currentParticipant) : '') + '</title>\n' +
+        '  <style>\n    body{font-family:Arial,sans-serif;margin:10px}\n' +
+        '    .group{border:1px solid #ccc;margin:5px 0;padding:5px}\n' +
+        '    .group-header{text-align:center}.cards{padding:5px}\n  </style>\n</head>\n<body>\n  ' +
+        participantInfo + clone.innerHTML + '\n</body>\n</html>';
+      var blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.style.visibility = 'hidden';
+      a.download = (currentParticipant || 'output') + '_group_classification.html';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    function resetAll() {
+      if (confirm('초기화 하시겠습니까?')) resetUIOnly();
+    }
+
+    /* ===== 평가 모드 ===== */
+    function startEvaluation() {
+      var groupCards = Array.from(document.querySelectorAll('#groupsList .card'));
+      groupCards.sort(function(a, b) {
+        return parseInt(a.id.replace('card',''), 10) - parseInt(b.id.replace('card',''), 10);
+      });
+      var cc = document.getElementById('cardsContainer');
+      groupCards.forEach(function(c) { cc.appendChild(c); });
+
+      var groupsList = document.getElementById('groupsList');
+      groupsList.innerHTML = '';
+      groupsList.style.flexDirection = 'column';
+
+      var legend = document.createElement('div');
+      legend.className = 'legend';
+      legend.textContent = '1점 매우 아니다, 2점 아니다, 3점 보통이다, 4점 그렇다, 5점 매우 그렇다';
+      groupsList.appendChild(legend);
+
+      var sortedCards = Array.from(cc.querySelectorAll('.card')).sort(function(a, b) {
+        return parseInt(a.id.replace('card',''), 10) - parseInt(b.id.replace('card',''), 10);
+      });
+      sortedCards.forEach(function(card) {
+        var evalDiv = document.createElement('div');
+        evalDiv.className = 'evaluation';
+        evalDiv.setAttribute('data-rating', '');
+        var span = document.createElement('span');
+        span.textContent = 's' + card.id.replace('card','');
+        evalDiv.appendChild(span);
+        var opts = document.createElement('div');
+        opts.className = 'rating-options';
+        [
+          { v:'1', l:'매우 아니다' }, { v:'2', l:'아니다' }, { v:'3', l:'보통이다' },
+          { v:'4', l:'그렇다' }, { v:'5', l:'매우 그렇다' }
+        ].forEach(function(o) {
+          var btn = document.createElement('button');
+          btn.textContent = o.v;
+          btn.title = o.v + '점: ' + o.l;
+          btn.addEventListener('click', function() {
+            Array.from(opts.children).forEach(function(s) { s.classList.remove('selected'); });
+            btn.classList.add('selected');
+            evalDiv.setAttribute('data-rating', o.v);
+            computeResults();
+            saveState();
+          });
+          opts.appendChild(btn);
+        });
+        evalDiv.appendChild(opts);
+        groupsList.appendChild(evalDiv);
+      });
+
+      var bb = document.getElementById('bottomButtons');
+      if (!document.getElementById('saveRatingsBtn')) {
+        var btn = document.createElement('button');
+        btn.id = 'saveRatingsBtn';
+        btn.textContent = '평정 점수 저장';
+        btn.onclick = saveRatingsToExcel;
+        bb.appendChild(btn);
+      }
+    }
+
+    function computeResults() {
+      var evals = document.querySelectorAll('.evaluation');
+      var ratings = [];
+      evals.forEach(function(e) {
+        var r = e.getAttribute('data-rating');
+        if (r) ratings.push(parseInt(r, 10));
+      });
+      if (ratings.length === evals.length && ratings.length > 0) {
+        var n = ratings.length;
+        var avg = ratings.reduce(function(a,b){return a+b;}, 0) / n;
+        var sd = Math.sqrt(ratings.reduce(function(a,b){return a+Math.pow(b-avg,2);}, 0) / n);
+        var rd = document.getElementById('evaluationResult');
+        rd.innerHTML = '<strong>평균 점수:</strong> ' + avg.toFixed(2) + '<br><strong>표준편차:</strong> ' + sd.toFixed(2);
+      }
+    }
+
+    function saveRatingsToExcel() {
+      var evals = document.querySelectorAll('.evaluation');
+      var data = [];
+      var ratings = [];
+      if (currentParticipant) data.push({ Statement: '연구참여자', Rating: currentParticipant });
+      evals.forEach(function(e) {
+        var stmt = e.querySelector('span').textContent;
+        var r = e.getAttribute('data-rating');
+        data.push({ Statement: stmt, Rating: r });
+        if (r) ratings.push(parseInt(r, 10));
+      });
+      if (data.length === 0) { alert('평가 데이터가 없습니다.'); return; }
+      if (ratings.length === evals.length && ratings.length > 0) {
+        var n = ratings.length;
+        var avg = ratings.reduce(function(a,b){return a+b;},0)/n;
+        var sd = Math.sqrt(ratings.reduce(function(a,b){return a+Math.pow(b-avg,2);},0)/n);
+        data.push({ Statement: '평균 점수', Rating: avg.toFixed(2) });
+        data.push({ Statement: '표준편차', Rating: sd.toFixed(2) });
+      }
+      var ws = XLSX.utils.json_to_sheet(data, { header: ['Statement','Rating'] });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Ratings');
+      XLSX.writeFile(wb, (currentParticipant || 'output') + '_ratings.xlsx');
+    }
+  </script>
+</head>
+<body onload="initApp()">
+
+  <!-- 참여자 이름 입력 모달 -->
+  <div id="participantModal" class="modal-overlay">
+    <div class="modal-content">
+      <h3>pre-CMS 개념도 작성 프로그램</h3>
+      <p>연구참여자 이름을 입력하고 확인을 눌러주세요.</p>
+      <input type="text" id="participantNameInput" placeholder="이름을 입력하세요"
+             onkeydown="participantKeydown(event)" />
+      <div>
+        <button style="background:#3a7bd5;color:white;border:none;padding:8px 24px;font-size:1em;border-radius:4px;cursor:pointer"
+                onclick="confirmParticipant()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 참여자 목록 관리 모달 -->
+  <div id="participantListModal" class="modal-overlay">
+    <div class="modal-content" style="min-width:440px">
+      <h3>저장된 참여자 데이터 관리</h3>
+      <div id="participantList" style="max-height:55vh;overflow-y:auto;text-align:left"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+        <button class="btn-primary" onclick="addNewParticipantFromList()">새 참여자 추가</button>
+        <button onclick="document.getElementById('participantListModal').style.display='none'"
+                style="padding:5px 16px">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상단 참여자 정보 바 -->
+  <div id="participantBar">
+    <div>
+      <span class="bar-title">pre-CMS</span>
+      &nbsp;|&nbsp;참여자:&nbsp;<strong id="currentParticipantName">-</strong>
+    </div>
+    <div>
+      <button onclick="saveState()">저장</button>
+      <button id="manageParticipantsBtn" style="display:none" onclick="showParticipantList()">참여자 관리</button>
+    </div>
+  </div>
+
+  <!-- 메인 컨텐츠 -->
+  <div id="mainContent">
+    <!-- 진술문 카드 영역 -->
+    <div id="cardsContainer">
+      <h2>진술문 카드</h2>
+      <div id="uploadExcelContainer">
+        <input type="file" id="excelInput" accept=".xlsx,.xls" />
+        <button onclick="uploadExcel()">엑셀 업로드</button>
+      </div>
+    </div>
+    <!-- 그룹 영역 -->
+    <div id="groupsContainer">
+      <h2>그룹영역</h2>
+      <div id="groupsList"></div>
+      <div id="evaluationResult"></div>
+      <div id="bottomButtons">
+        <button onclick="addGroup()">새 그룹 추가</button>
+        <button onclick="globalDeleteGroup()">그룹 삭제</button>
+        <button onclick="exportMatrix()">유사성행렬생성</button>
+        <button onclick="saveGroupHTML()">분류결과저장</button>
+        <button onclick="resetAll()">모든 정보 초기화</button>
+        <button onclick="startEvaluation()">진술문평정</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 커스텀 프롬프트 모달 -->
+  <div id="customPrompt" class="modal-overlay">
+    <div id="customPromptContent" class="modal-content">
+      <p id="promptMessage"></p>
+      <input type="text" id="promptInput" />
+      <div>
+        <button id="promptOk">확인</button>
+        <button id="promptCancel">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 초기 4개 그룹 생성
+    (function() {
+      for (var i = 1; i <= 4; i++) { createGroupElement(i); }
+    })();
+  </script>
+</body>
+</html>
